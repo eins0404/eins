@@ -26,3 +26,10 @@ sudo apt install python3-colcon-common-extensions
 ## 잘못된 빌드 삭제
 sudo lrm -r build install log
 ## colcon  code --> colcon build --> ros2_ws 설정 
+
+source /opt/ros/humble/setup.bash
+cd ~/ros2study/src
+ros2 pkg create --build-type ament_python ros2_study
+cd ..
+colcon build
+
