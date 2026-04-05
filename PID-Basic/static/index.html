@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PID Controller Study — 모터 편심봉 시뮬레이션</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #fafbfc;
+            color: #333;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        .main-layout {
+            display: flex;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+        }
+        .canvas-panel {
+            background: #fff;
+            border: 1px solid #e0e6ed;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            flex: 0 0 420px;
+        }
+        .control-panel {
+            background: #fff;
+            border: 1px solid #e0e6ed;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            flex: 1;
+            min-width: 320px;
+        }
+        canvas#simCanvas {
+            display: block;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e0e6ed;
+        }
+        .info-bar {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.85em;
+            color: #7f8c8d;
+        }
+        .info-bar span { font-weight: 600; color: #2c3e50; }
+
+        /* Controls */
+        .section-title {
+            font-weight: 700;
+            color: #2980b9;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #ebf5fb;
+            font-size: 1.05em;
+        }
+        .mode-toggle {
+            display: flex;
+            gap: 0;
+            margin-bottom: 15px;
+        }
+        .mode-btn {
+            flex: 1;
+            padding: 8px 16px;
+            border: 2px solid #3498db;
+            background: #fff;
+            color: #3498db;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95em;
+            transition: all 0.2s;
+        }
+        .mode-btn:first-child { border-radius: 6px 0 0 6px; }
+        .mode-btn:last-child { border-radius: 0 6px 6px 0; }
+        .mode-btn.active {
+            background: #3498db;
+            color: #fff;
+        }
+        .slider-group {
+            margin-bottom: 12px;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 0.9em;
+        }
+        .slider-label .name { font-weight: 600; color: #555; }
+        .slider-label .value { font-weight: 700; color: #2c3e50; }
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #e0e6ed;
+            border-radius: 3px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3498db;
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .preset-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .preset-btn {
+            padding: 6px 12px;
+            border: 1px solid #bdc3c7;
+            background: #ecf0f1;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 600;
+            color: #555;
+            transition: all 0.2s;
+        }
+        .preset-btn:hover { background: #d5dbdb; }
+        .preset-btn.active-preset { background: #3498db; color: #fff; border-color: #3498db; }
+        .action-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+        }
+        .action-btn {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        .btn-reset { background: #e74c3c; color: #fff; }
+        .btn-reset:hover { background: #c0392b; }
+        .btn-pause { background: #f39c12; color: #fff; }
+        .btn-pause:hover { background: #d68910; }
+        .btn-pause.playing { background: #27ae60; }
+        .btn-pause.playing:hover { background: #1e8449; }
+
+        /* Graphs */
+        .graphs-section {
+            max-width: 1200px;
+            margin: 20px auto 0;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .graph-card {
+            background: #fff;
+            border: 1px solid #e0e6ed;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .graph-title {
+            font-size: 0.85em;
+            font-weight: 700;
+            color: #2980b9;
+            margin-bottom: 5px;
+        }
+        canvas.graph-canvas {
+            width: 100%;
+            height: 120px;
+            display: block;
+            border-radius: 4px;
+            background: #f8f9fa;
+        }
+
+        /* Physics params collapsible */
+        .params-section {
+            max-width: 1200px;
+            margin: 15px auto 0;
+        }
+        .params-toggle {
+            background: #fff;
+            border: 1px solid #e0e6ed;
+            border-radius: 8px;
+            padding: 12px 15px;
+            cursor: pointer;
+            font-weight: 700;
+            color: #2980b9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .params-toggle .arrow { transition: transform 0.3s; }
+        .params-toggle.open .arrow { transform: rotate(180deg); }
+        .params-content {
+            background: #fff;
+            border: 1px solid #e0e6ed;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            padding: 15px;
+            display: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .params-content.show { display: block; }
+        .params-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .manual-section, .pid-section { display: none; }
+        .manual-section.active, .pid-section.active { display: block; }
+
+        /* Tooltip */
+        .tooltip-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #bdc3c7;
+            color: #fff;
+            font-size: 11px;
+            text-align: center;
+            line-height: 16px;
+            cursor: help;
+            position: relative;
+            margin-left: 4px;
+        }
+        .tooltip-icon:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: 120%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2c3e50;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            white-space: nowrap;
+            z-index: 10;
+            font-weight: 400;
+        }
+
+        /* Trajectory button */
+        .btn-trajectory {
+            background: #8e44ad;
+            color: #fff;
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .btn-trajectory:hover { background: #7d3c98; }
+        .btn-trajectory.active { background: #6c3483; box-shadow: 0 0 0 2px #d2b4de; }
+        .btn-trajectory:disabled { background: #bdc3c7; cursor: not-allowed; }
+
+        /* Floating Window */
+        .traj-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.3);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .traj-overlay.show { display: flex; }
+        .traj-window {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+            padding: 24px;
+            width: 420px;
+            max-width: 95vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        .traj-window .traj-title {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: #8e44ad;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .traj-window .traj-subtitle {
+            font-size: 0.82em;
+            color: #7f8c8d;
+            margin-bottom: 16px;
+        }
+        .traj-close {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #95a5a6;
+            padding: 0 4px;
+            line-height: 1;
+        }
+        .traj-close:hover { color: #e74c3c; }
+        .traj-section-label {
+            font-weight: 700;
+            font-size: 0.85em;
+            color: #8e44ad;
+            margin-top: 14px;
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 2px solid #f0e6f6;
+        }
+        .traj-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .traj-row label {
+            font-size: 0.85em;
+            font-weight: 600;
+            color: #555;
+            min-width: 110px;
+        }
+        .traj-row input[type="number"] {
+            width: 80px;
+            padding: 5px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9em;
+            text-align: right;
+        }
+        .traj-row .traj-unit {
+            font-size: 0.82em;
+            color: #95a5a6;
+            min-width: 40px;
+        }
+        .traj-profile-preview {
+            background: #f8f4fc;
+            border: 1px solid #e8daef;
+            border-radius: 8px;
+            margin-top: 14px;
+            padding: 10px;
+        }
+        .traj-profile-preview canvas {
+            width: 100%;
+            height: 100px;
+            display: block;
+            border-radius: 4px;
+            background: #fff;
+        }
+        .traj-profile-labels {
+            display: flex;
+            justify-content: space-around;
+            font-size: 0.75em;
+            color: #8e44ad;
+            margin-top: 4px;
+            font-weight: 600;
+        }
+        .traj-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 18px;
+        }
+        .traj-actions button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.95em;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .traj-btn-apply {
+            background: #8e44ad;
+            color: #fff;
+        }
+        .traj-btn-apply:hover { background: #7d3c98; }
+        .traj-btn-cancel {
+            background: #ecf0f1;
+            color: #555;
+        }
+        .traj-btn-cancel:hover { background: #d5dbdb; }
+        .traj-btn-stop {
+            background: #e74c3c;
+            color: #fff;
+        }
+        .traj-btn-stop:hover { background: #c0392b; }
+
+        /* Trajectory status bar */
+        .traj-status {
+            display: none;
+            background: #f0e6f6;
+            border: 1px solid #d2b4de;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-top: 10px;
+            font-size: 0.85em;
+        }
+        .traj-status.show { display: block; }
+        .traj-status .traj-phase {
+            font-weight: 700;
+            color: #8e44ad;
+        }
+        .traj-progress-bar {
+            height: 4px;
+            background: #e8daef;
+            border-radius: 2px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+        .traj-progress-fill {
+            height: 100%;
+            background: #8e44ad;
+            border-radius: 2px;
+            transition: width 0.1s;
+            width: 0%;
+        }
+
+        @media (max-width: 900px) {
+            .main-layout { flex-direction: column; }
+            .canvas-panel { flex: none; }
+            .graphs-section { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <h1>PID Controller Study — 모터 편심봉 시뮬레이션</h1>
+
+    <div class="main-layout">
+        <!-- Canvas Panel -->
+        <div class="canvas-panel">
+            <canvas id="simCanvas" width="390" height="390"></canvas>
+            <div class="info-bar">
+                <div>각도: <span id="dispAngle">0.0</span>°</div>
+                <div>각속도: <span id="dispOmega">0.0</span>°/s</div>
+                <div>전압: <span id="dispVoltage">0.0</span> V</div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <div class="section-title">제어 모드</div>
+            <div class="mode-toggle">
+                <button class="mode-btn active" id="btnManual" onclick="setMode('manual')">수동 제어</button>
+                <button class="mode-btn" id="btnPID" onclick="setMode('pid')">PID 제어</button>
+            </div>
+
+            <!-- Manual Mode -->
+            <div class="manual-section active" id="manualSection">
+                <div class="section-title">수동 모드 — 전압 인가
+                    <span class="tooltip-icon" data-tip="모터에 직접 전압을 인가합니다. 양(+)전압은 반시계, 음(-)전압은 시계 방향">?</span>
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span class="name">인가 전압 (V)</span>
+                        <span class="value" id="voltageVal">0.0 V</span>
+                    </div>
+                    <input type="range" id="voltageSlider" min="-12" max="12" step="0.1" value="0"
+                           oninput="manualVoltage=parseFloat(this.value); document.getElementById('voltageVal').textContent=this.value+' V'">
+                </div>
+                <div style="text-align:center; margin-top:8px;">
+                    <button class="preset-btn" onclick="document.getElementById('voltageSlider').value=0; manualVoltage=0; document.getElementById('voltageVal').textContent='0.0 V'">전압 해제 (0V)</button>
+                </div>
+            </div>
+
+            <!-- PID Mode -->
+            <div class="pid-section" id="pidSection">
+                <div class="section-title">PID 제어 모드
+                    <span class="tooltip-icon" data-tip="목표 각도를 설정하고 P, I, D 게인을 조절하여 제어 응답을 관찰합니다">?</span>
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span class="name">목표 각도</span>
+                        <span class="value" id="targetVal">0°</span>
+                    </div>
+                    <input type="range" id="targetSlider" min="-180" max="180" step="1" value="0"
+                           oninput="pidTarget=parseFloat(this.value)*Math.PI/180; document.getElementById('targetVal').textContent=this.value+'°'">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span class="name">Kp (비례)
+                            <span class="tooltip-icon" data-tip="오차에 비례하는 제어. 클수록 빠른 응답, 그러나 진동 유발">?</span>
+                        </span>
+                        <span class="value" id="kpVal">5.0</span>
+                    </div>
+                    <input type="range" id="kpSlider" min="0" max="50" step="0.1" value="5"
+                           oninput="pidKp=parseFloat(this.value); document.getElementById('kpVal').textContent=this.value">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span class="name">Ki (적분)
+                            <span class="tooltip-icon" data-tip="누적 오차를 제거. 정상상태 오차 해소, 과도하면 오버슈트">?</span>
+                        </span>
+                        <span class="value" id="kiVal">0.0</span>
+                    </div>
+                    <input type="range" id="kiSlider" min="0" max="20" step="0.1" value="0"
+                           oninput="pidKi=parseFloat(this.value); document.getElementById('kiVal').textContent=this.value">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span class="name">Kd (미분)
+                            <span class="tooltip-icon" data-tip="오차 변화율에 반응. 진동 억제(감쇠), 과도하면 불안정">?</span>
+                        </span>
+                        <span class="value" id="kdVal">0.0</span>
+                    </div>
+                    <input type="range" id="kdSlider" min="0" max="5" step="0.01" value="0"
+                           oninput="pidKd=parseFloat(this.value); document.getElementById('kdVal').textContent=this.value">
+                </div>
+
+                <div class="section-title" style="margin-top:10px">프리셋</div>
+                <div class="preset-row">
+                    <button class="preset-btn" onclick="applyPreset(5,0,0,'P만')">P만</button>
+                    <button class="preset-btn" onclick="applyPreset(5,0,0.5,'PD')">PD</button>
+                    <button class="preset-btn" onclick="applyPreset(5,2,0.5,'PID')">PID</button>
+                    <button class="preset-btn" onclick="applyPreset(20,10,1,'공격적')">공격적</button>
+                </div>
+            </div>
+
+            <!-- Trajectory button (PID mode only) -->
+            <button class="btn-trajectory" id="btnTrajectory" onclick="openTrajectoryWindow()" style="display:none;">
+                Trajectory 설정
+            </button>
+            <div class="traj-status" id="trajStatus">
+                <div>Trajectory 실행 중 — <span class="traj-phase" id="trajPhaseLabel">가속</span>
+                    <span id="trajTimeInfo" style="float:right; color:#7f8c8d;"></span>
+                </div>
+                <div class="traj-progress-bar">
+                    <div class="traj-progress-fill" id="trajProgressFill"></div>
+                </div>
+            </div>
+
+            <div class="action-row">
+                <button class="action-btn btn-reset" onclick="resetSimulation()">리셋</button>
+                <button class="action-btn btn-pause playing" id="pauseBtn" onclick="togglePause()">일시정지</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trajectory Floating Window -->
+    <div class="traj-overlay" id="trajOverlay" onclick="if(event.target===this)closeTrajectoryWindow()">
+        <div class="traj-window">
+            <div class="traj-title">
+                <span>Trajectory 설정</span>
+                <button class="traj-close" onclick="closeTrajectoryWindow()">&times;</button>
+            </div>
+            <div class="traj-subtitle">사다리꼴 속도 프로파일 — 가속 → 정속 → 감속 구간을 설정합니다</div>
+
+            <div class="traj-section-label">위치 설정</div>
+            <div class="traj-row">
+                <label>시작 각도</label>
+                <input type="number" id="trajStartAngle" value="0" step="1">
+                <span class="traj-unit">°</span>
+                <button class="preset-btn" style="font-size:0.78em; padding:3px 8px;" onclick="document.getElementById('trajStartAngle').value=Math.round(theta*180/Math.PI); updateTrajPreview();">현재값</button>
+            </div>
+            <div class="traj-row">
+                <label>목표 각도</label>
+                <input type="number" id="trajEndAngle" value="90" step="1">
+                <span class="traj-unit">°</span>
+            </div>
+
+            <div class="traj-section-label">속도 프로파일</div>
+            <div class="traj-row">
+                <label>최대 각속도</label>
+                <input type="number" id="trajMaxVel" value="90" step="5" min="1">
+                <span class="traj-unit">°/s</span>
+            </div>
+            <div class="traj-row">
+                <label>가속 시간</label>
+                <input type="number" id="trajAccelTime" value="0.5" step="0.1" min="0.1">
+                <span class="traj-unit">초</span>
+            </div>
+            <div class="traj-row">
+                <label>감속 시간</label>
+                <input type="number" id="trajDecelTime" value="0.5" step="0.1" min="0.1">
+                <span class="traj-unit">초</span>
+            </div>
+
+            <div class="traj-profile-preview">
+                <div style="font-size:0.82em; font-weight:700; color:#8e44ad; margin-bottom:6px;">프로파일 미리보기</div>
+                <canvas id="trajPreviewCanvas"></canvas>
+                <div class="traj-profile-labels">
+                    <span id="trajLabelAccel">가속 0.5s</span>
+                    <span id="trajLabelCruise">정속 0.0s</span>
+                    <span id="trajLabelDecel">감속 0.5s</span>
+                    <span id="trajLabelTotal">총 1.0s</span>
+                </div>
+            </div>
+
+            <div class="traj-actions">
+                <button class="traj-btn-cancel" onclick="closeTrajectoryWindow()">취소</button>
+                <button class="traj-btn-apply" onclick="applyTrajectory()">실행</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Graphs -->
+    <div class="graphs-section">
+        <div class="graph-card">
+            <div class="graph-title">각도 (°) vs 시간</div>
+            <canvas class="graph-canvas" id="graphAngle"></canvas>
+        </div>
+        <div class="graph-card">
+            <div class="graph-title">오차 (°) vs 시간</div>
+            <canvas class="graph-canvas" id="graphError"></canvas>
+        </div>
+        <div class="graph-card">
+            <div class="graph-title">제어 전압 (V) vs 시간</div>
+            <canvas class="graph-canvas" id="graphVoltage"></canvas>
+        </div>
+        <div class="graph-card">
+            <div class="graph-title">P / I / D 항 vs 시간</div>
+            <canvas class="graph-canvas" id="graphPID"></canvas>
+        </div>
+    </div>
+
+    <!-- Physics Parameters -->
+    <div class="params-section">
+        <div class="params-toggle" id="paramsToggle" onclick="toggleParams()">
+            물리 파라미터 조절
+            <span class="arrow">&#9660;</span>
+        </div>
+        <div class="params-content" id="paramsContent">
+            <div class="params-grid">
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span class="name">관성 모멘트 I (kg·m²)</span>
+                        <span class="value" id="paramI">0.01</span>
+                    </div>
+                    <input type="range" min="0.001" max="0.1" step="0.001" value="0.01"
+                           oninput="phys.I=parseFloat(this.value); document.getElementById('paramI').textContent=this.value">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span class="name">질량 m (kg)</span>
+                        <span class="value" id="paramM">0.5</span>
+                    </div>
+                    <input type="range" min="0.1" max="2.0" step="0.01" value="0.5"
+                           oninput="phys.m=parseFloat(this.value); document.getElementById('paramM').textContent=this.value">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span class="name">무게중심 거리 L (m)</span>
+                        <span class="value" id="paramL">0.15</span>
+                    </div>
+                    <input type="range" min="0.05" max="0.5" step="0.01" value="0.15"
+                           oninput="phys.Lcm=parseFloat(this.value); document.getElementById('paramL').textContent=this.value">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span class="name">감쇠 계수 b (N·m·s/rad)</span>
+                        <span class="value" id="paramB">0.05</span>
+                    </div>
+                    <input type="range" min="0" max="0.5" step="0.01" value="0.05" id="paramBSlider"
+                           oninput="phys.b=parseFloat(this.value); document.getElementById('paramB').textContent=this.value">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span class="name">토크 상수 Kt (N·m/A)</span>
+                        <span class="value" id="paramKt">0.1</span>
+                    </div>
+                    <input type="range" min="0.01" max="0.3" step="0.01" value="0.1"
+                           oninput="phys.Kt=parseFloat(this.value); document.getElementById('paramKt').textContent=this.value">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span class="name">전기자 저항 R (Ω)</span>
+                        <span class="value" id="paramR">1.0</span>
+                    </div>
+                    <input type="range" min="0.5" max="10" step="0.1" value="1.0"
+                           oninput="phys.R=parseFloat(this.value); document.getElementById('paramR').textContent=this.value">
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+// ========== Physics Parameters ==========
+const phys = {
+    I: 0.01,        // moment of inertia (kg·m²)
+    m: 0.5,         // mass (kg)
+    g: 9.81,        // gravity (m/s²)
+    Lcm: 0.15,      // distance to center of mass (m)
+    b: 0.05,        // damping coefficient (N·m·s/rad)
+    Kt: 0.1,        // motor torque constant (N·m/A)
+    Ke: 0.1,        // back-EMF constant (V·s/rad)
+    R: 1.0          // armature resistance (Ω)
+};
+
+// ========== State Variables ==========
+let theta = 0;          // angle (rad), 0 = hanging down
+let omega = 0;          // angular velocity (rad/s)
+let simTime = 0;
+let paused = false;
+let mode = 'manual';    // 'manual' or 'pid'
+
+// Manual mode
+let manualVoltage = 0;
+
+// PID mode
+let pidTarget = 0;            // target angle (rad)
+let pidKp = 5.0;
+let pidKi = 0.0;
+let pidKd = 0.0;
+
+// PID internal state
+let pidIntegral = 0;
+let pidPrevError = 0;
+let pidDFiltered = 0;
+let pidPTerm = 0;
+let pidITerm = 0;
+let pidDTerm = 0;
+let currentVoltage = 0;
+
+// Graph data
+const GRAPH_WINDOW = 10; // seconds
+const graphData = {
+    time: [],
+    angle: [],
+    target: [],
+    error: [],
+    voltage: [],
+    pTerm: [],
+    iTerm: [],
+    dTerm: []
+};
+
+// ========== Physics Engine ==========
+function computeAccel(th, om, V) {
+    const tauMotor = phys.Kt * (V - phys.Ke * om) / phys.R;
+    const tauGravity = phys.m * phys.g * phys.Lcm * Math.sin(th);
+    const tauDamping = phys.b * om;
+    return (tauMotor - tauGravity - tauDamping) / phys.I;
+}
+
+function rk4Step(th, om, V, dt) {
+    const k1_om = computeAccel(th, om, V);
+    const k1_th = om;
+
+    const k2_om = computeAccel(th + 0.5*dt*k1_th, om + 0.5*dt*k1_om, V);
+    const k2_th = om + 0.5*dt*k1_om;
+
+    const k3_om = computeAccel(th + 0.5*dt*k2_th, om + 0.5*dt*k2_om, V);
+    const k3_th = om + 0.5*dt*k2_om;
+
+    const k4_om = computeAccel(th + dt*k3_th, om + dt*k3_om, V);
+    const k4_th = om + dt*k3_om;
+
+    const newTh = th + (dt/6) * (k1_th + 2*k2_th + 2*k3_th + k4_th);
+    const newOm = om + (dt/6) * (k1_om + 2*k2_om + 2*k3_om + k4_om);
+    return [newTh, newOm];
+}
+
+// ========== PID Controller ==========
+function computePID(dt) {
+    // Shortest-path error
+    let error = pidTarget - theta;
+    while (error > Math.PI) error -= 2 * Math.PI;
+    while (error < -Math.PI) error += 2 * Math.PI;
+
+    // P term
+    pidPTerm = pidKp * error;
+
+    // I term with anti-windup
+    pidIntegral += error * dt;
+    pidITerm = pidKi * pidIntegral;
+    // Clamp integral contribution
+    const iMax = 12;
+    if (pidITerm > iMax) { pidITerm = iMax; pidIntegral = iMax / (pidKi || 1); }
+    if (pidITerm < -iMax) { pidITerm = -iMax; pidIntegral = -iMax / (pidKi || 1); }
+
+    // D term with low-pass filter
+    const dError = (error - pidPrevError) / dt;
+    const alpha = 0.3;
+    pidDFiltered = alpha * dError + (1 - alpha) * pidDFiltered;
+    pidDTerm = pidKd * pidDFiltered;
+    pidPrevError = error;
+
+    // Total output clamped to voltage range
+    let output = pidPTerm + pidITerm + pidDTerm;
+    output = Math.max(-12, Math.min(12, output));
+    return output;
+}
+
+// ========== Simulation Loop ==========
+const SIM_DT = 1 / 240;
+const SUB_STEPS = 4;
+
+function simulationStep() {
+    if (paused) return;
+
+    for (let i = 0; i < SUB_STEPS; i++) {
+        // Update trajectory target before PID computation
+        if (trajActive) updateTrajectory();
+
+        if (mode === 'pid') {
+            currentVoltage = computePID(SIM_DT);
+        } else {
+            currentVoltage = manualVoltage;
+        }
+
+        const [newTh, newOm] = rk4Step(theta, omega, currentVoltage, SIM_DT);
+        theta = newTh;
+        omega = newOm;
+        simTime += SIM_DT;
+    }
+
+    // Normalize theta to [-PI, PI] for display
+    // But keep raw theta for continuous rotation display
+    recordGraphData();
+}
+
+function recordGraphData() {
+    graphData.time.push(simTime);
+
+    // Display angle in degrees [-180, 180]
+    let displayAngleDeg = theta * 180 / Math.PI;
+    displayAngleDeg = ((displayAngleDeg + 180) % 360 + 360) % 360 - 180;
+    graphData.angle.push(displayAngleDeg);
+
+    // Error
+    let error = pidTarget - theta;
+    while (error > Math.PI) error -= 2 * Math.PI;
+    while (error < -Math.PI) error += 2 * Math.PI;
+    graphData.error.push(error * 180 / Math.PI);
+
+    // Target angle for graph
+    let targetDeg = pidTarget * 180 / Math.PI;
+    targetDeg = ((targetDeg + 180) % 360 + 360) % 360 - 180;
+    graphData.target.push(targetDeg);
+
+    graphData.voltage.push(currentVoltage);
+    graphData.pTerm.push(pidPTerm);
+    graphData.iTerm.push(pidITerm);
+    graphData.dTerm.push(pidDTerm);
+
+    // Trim to window
+    const cutoffTime = simTime - GRAPH_WINDOW;
+    while (graphData.time.length > 0 && graphData.time[0] < cutoffTime) {
+        graphData.time.shift();
+        graphData.angle.shift();
+        graphData.target.shift();
+        graphData.error.shift();
+        graphData.voltage.shift();
+        graphData.pTerm.shift();
+        graphData.iTerm.shift();
+        graphData.dTerm.shift();
+    }
+}
+
+// ========== Canvas Animation ==========
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+const CX = canvas.width / 2;
+const CY = canvas.height / 2;
+const ROD_LEN = 140;
+
+function drawSimulation() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Background grid
+    ctx.strokeStyle = '#e8eaed';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < canvas.width; i += 30) {
+        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+    }
+
+    // Gravity arrow
+    ctx.save();
+    ctx.strokeStyle = '#bdc3c7';
+    ctx.lineWidth = 2;
+    ctx.fillStyle = '#bdc3c7';
+    ctx.beginPath();
+    ctx.moveTo(CX + 160, CY - 40);
+    ctx.lineTo(CX + 160, CY + 40);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(CX + 153, CY + 30);
+    ctx.lineTo(CX + 160, CY + 45);
+    ctx.lineTo(CX + 167, CY + 30);
+    ctx.fill();
+    ctx.font = '12px sans-serif';
+    ctx.fillText('g', CX + 170, CY + 5);
+    ctx.restore();
+
+    // Reference circle (rotation path)
+    ctx.beginPath();
+    ctx.arc(CX, CY, ROD_LEN, 0, 2 * Math.PI);
+    ctx.strokeStyle = '#e0e6ed';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Target angle line (PID mode) — same coord system as rod: (sin(θ), cos(θ))
+    if (mode === 'pid') {
+        const tx = CX + ROD_LEN * Math.sin(pidTarget);
+        const ty = CY + ROD_LEN * Math.cos(pidTarget);
+        ctx.beginPath();
+        ctx.moveTo(CX, CY);
+        ctx.lineTo(tx, ty);
+        ctx.strokeStyle = '#2ecc71';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Target label
+        ctx.fillStyle = '#2ecc71';
+        ctx.font = 'bold 12px sans-serif';
+        const labelX = CX + (ROD_LEN + 18) * Math.sin(pidTarget);
+        const labelY = CY + (ROD_LEN + 18) * Math.cos(pidTarget);
+        ctx.fillText('목표', labelX - 12, labelY + 4);
+    }
+
+    // Rod (the unbalanced bar)
+    // Drawing convention: theta=0 → rod points down, theta increases counterclockwise
+    // Canvas: x-right, y-down. To map: drawAngle = -theta + PI/2 rotates from "down"
+    // Actually simpler: rod end at (CX + ROD_LEN*sin(theta), CY + ROD_LEN*cos(theta))
+    // theta=0: sin=0, cos=1 → straight down ✓
+    // theta=PI/2: sin=1, cos=0 → right
+    const rodEndX = CX + ROD_LEN * Math.sin(theta);
+    const rodEndY = CY + ROD_LEN * Math.cos(theta);
+
+    // Rod shadow
+    ctx.beginPath();
+    ctx.moveTo(CX, CY);
+    ctx.lineTo(rodEndX, rodEndY);
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Rod
+    ctx.beginPath();
+    ctx.moveTo(CX, CY);
+    ctx.lineTo(rodEndX, rodEndY);
+    ctx.strokeStyle = '#5d6d7e';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Weight blob at end
+    ctx.beginPath();
+    ctx.arc(rodEndX, rodEndY, 14, 0, 2 * Math.PI);
+    const gradient = ctx.createRadialGradient(rodEndX - 3, rodEndY - 3, 2, rodEndX, rodEndY, 14);
+    gradient.addColorStop(0, '#e74c3c');
+    gradient.addColorStop(1, '#c0392b');
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    ctx.strokeStyle = '#922b21';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Motor hub
+    ctx.beginPath();
+    ctx.arc(CX, CY, 18, 0, 2 * Math.PI);
+    const hubGrad = ctx.createRadialGradient(CX - 3, CY - 3, 2, CX, CY, 18);
+    hubGrad.addColorStop(0, '#85929e');
+    hubGrad.addColorStop(1, '#5d6d7e');
+    ctx.fillStyle = hubGrad;
+    ctx.fill();
+    ctx.strokeStyle = '#4a5568';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Center dot
+    ctx.beginPath();
+    ctx.arc(CX, CY, 4, 0, 2 * Math.PI);
+    ctx.fillStyle = '#2c3e50';
+    ctx.fill();
+
+    // Angle arc — from "down" (0°) to current rod angle
+    // Canvas arc angles: 0=right, PI/2=down, PI=left, -PI/2=up
+    // Rod canvas angle = atan2(rodEndY - CY, rodEndX - CX)
+    // "Down" in canvas = PI/2
+    const arcRadius = 50;
+    const downCanvasAngle = Math.PI / 2;
+    const rodCanvasAngle = Math.atan2(rodEndY - CY, rodEndX - CX);
+    if (Math.abs(theta) > 0.02) {
+        // Determine sweep direction: theta>0 means CCW from down, which is CW in canvas
+        ctx.beginPath();
+        if (theta > 0) {
+            // Rod is CW from down in canvas coords → draw arc CW (default)
+            ctx.arc(CX, CY, arcRadius, rodCanvasAngle, downCanvasAngle, false);
+        } else {
+            // Rod is CCW from down → draw arc CCW
+            ctx.arc(CX, CY, arcRadius, rodCanvasAngle, downCanvasAngle, true);
+        }
+        ctx.strokeStyle = '#e67e22';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+    // Angle text — display normalized to [-180, 180]
+    let displayDeg = theta * 180 / Math.PI;
+    displayDeg = ((displayDeg + 180) % 360 + 360) % 360 - 180;
+    ctx.fillStyle = '#e67e22';
+    ctx.font = 'bold 14px sans-serif';
+    // Position the label near the arc midpoint
+    const midAngle = (downCanvasAngle + rodCanvasAngle) / 2;
+    const labelR = arcRadius + 18;
+    ctx.fillText(displayDeg.toFixed(1) + '°', CX + labelR * Math.cos(midAngle) - 15, CY + labelR * Math.sin(midAngle) + 5);
+
+    // Update info bar
+    document.getElementById('dispAngle').textContent = displayDeg.toFixed(1);
+    document.getElementById('dispOmega').textContent = (omega * 180 / Math.PI).toFixed(1);
+    document.getElementById('dispVoltage').textContent = currentVoltage.toFixed(2);
+}
+
+// ========== Graph Drawing ==========
+function setupGraphCanvas(canvasEl) {
+    const rect = canvasEl.getBoundingClientRect();
+    canvasEl.width = rect.width * window.devicePixelRatio;
+    canvasEl.height = rect.height * window.devicePixelRatio;
+    const gctx = canvasEl.getContext('2d');
+    gctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    return gctx;
+}
+
+function drawGraph(canvasId, datasets, colors, labels) {
+    const canvasEl = document.getElementById(canvasId);
+    const rect = canvasEl.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
+
+    // Resize if needed
+    if (canvasEl.width !== Math.floor(w * window.devicePixelRatio)) {
+        canvasEl.width = Math.floor(w * window.devicePixelRatio);
+        canvasEl.height = Math.floor(h * window.devicePixelRatio);
+    }
+    const gctx = canvasEl.getContext('2d');
+    gctx.save();
+    gctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+    gctx.clearRect(0, 0, w, h);
+
+    const pad = { left: 45, right: 10, top: 10, bottom: 20 };
+    const plotW = w - pad.left - pad.right;
+    const plotH = h - pad.top - pad.bottom;
+
+    // Find value range
+    let allMin = Infinity, allMax = -Infinity;
+    for (const data of datasets) {
+        for (const v of data) {
+            if (v < allMin) allMin = v;
+            if (v > allMax) allMax = v;
+        }
+    }
+    if (allMin === allMax) { allMin -= 1; allMax += 1; }
+    const vRange = allMax - allMin;
+    allMin -= vRange * 0.1;
+    allMax += vRange * 0.1;
+
+    // Grid
+    gctx.strokeStyle = '#e8eaed';
+    gctx.lineWidth = 0.5;
+    // Horizontal grid lines
+    for (let i = 0; i <= 4; i++) {
+        const y = pad.top + (plotH / 4) * i;
+        gctx.beginPath();
+        gctx.moveTo(pad.left, y);
+        gctx.lineTo(pad.left + plotW, y);
+        gctx.stroke();
+
+        // Labels
+        const val = allMax - (allMax - allMin) * (i / 4);
+        gctx.fillStyle = '#95a5a6';
+        gctx.font = '10px sans-serif';
+        gctx.textAlign = 'right';
+        gctx.fillText(val.toFixed(1), pad.left - 4, y + 3);
+    }
+
+    // Time axis
+    const tArr = graphData.time;
+    if (tArr.length < 2) { gctx.restore(); return; }
+    const tMin = tArr[0];
+    const tMax = tArr[tArr.length - 1];
+    const tRange = Math.max(tMax - tMin, 0.1);
+
+    // Draw zero line if in range
+    if (allMin <= 0 && allMax >= 0) {
+        const zeroY = pad.top + plotH * (1 - (0 - allMin) / (allMax - allMin));
+        gctx.strokeStyle = '#bdc3c7';
+        gctx.lineWidth = 1;
+        gctx.setLineDash([3, 3]);
+        gctx.beginPath();
+        gctx.moveTo(pad.left, zeroY);
+        gctx.lineTo(pad.left + plotW, zeroY);
+        gctx.stroke();
+        gctx.setLineDash([]);
+    }
+
+    // Data lines
+    for (let d = 0; d < datasets.length; d++) {
+        const data = datasets[d];
+        gctx.strokeStyle = colors[d];
+        gctx.lineWidth = 1.5;
+        gctx.beginPath();
+        for (let i = 0; i < data.length; i++) {
+            const x = pad.left + plotW * ((tArr[i] - tMin) / tRange);
+            const y = pad.top + plotH * (1 - (data[i] - allMin) / (allMax - allMin));
+            if (i === 0) gctx.moveTo(x, y);
+            else gctx.lineTo(x, y);
+        }
+        gctx.stroke();
+    }
+
+    // Legend
+    if (labels && labels.length > 1) {
+        let lx = pad.left + 5;
+        const ly = pad.top + 5;
+        gctx.font = '10px sans-serif';
+        for (let d = 0; d < labels.length; d++) {
+            gctx.fillStyle = colors[d];
+            gctx.fillRect(lx, ly, 12, 8);
+            gctx.fillStyle = '#555';
+            gctx.textAlign = 'left';
+            gctx.fillText(labels[d], lx + 15, ly + 8);
+            lx += gctx.measureText(labels[d]).width + 25;
+        }
+    }
+
+    // Time labels
+    gctx.fillStyle = '#95a5a6';
+    gctx.font = '10px sans-serif';
+    gctx.textAlign = 'center';
+    gctx.fillText(tMin.toFixed(1) + 's', pad.left, h - 3);
+    gctx.fillText(tMax.toFixed(1) + 's', pad.left + plotW, h - 3);
+
+    gctx.restore();
+}
+
+function drawAllGraphs() {
+    if (mode === 'pid') {
+        drawGraph('graphAngle', [graphData.angle, graphData.target], ['#3498db', '#2ecc71'], ['실제', '목표']);
+    } else {
+        drawGraph('graphAngle', [graphData.angle], ['#3498db'], null);
+    }
+    drawGraph('graphError', [graphData.error], ['#e74c3c'], null);
+    drawGraph('graphVoltage', [graphData.voltage], ['#27ae60'], null);
+    drawGraph('graphPID',
+        [graphData.pTerm, graphData.iTerm, graphData.dTerm],
+        ['#e74c3c', '#3498db', '#f39c12'],
+        ['P', 'I', 'D']
+    );
+}
+
+// ========== UI Functions ==========
+function setMode(m) {
+    mode = m;
+    document.getElementById('btnManual').classList.toggle('active', m === 'manual');
+    document.getElementById('btnPID').classList.toggle('active', m === 'pid');
+    document.getElementById('manualSection').classList.toggle('active', m === 'manual');
+    document.getElementById('pidSection').classList.toggle('active', m === 'pid');
+    document.getElementById('btnTrajectory').style.display = (m === 'pid') ? 'block' : 'none';
+
+    // Reset PID state when switching modes
+    pidIntegral = 0;
+    pidPrevError = 0;
+    pidDFiltered = 0;
+    if (m === 'manual') {
+        currentVoltage = manualVoltage;
+        stopTrajectory();
+    }
+}
+
+function applyPreset(kp, ki, kd, name) {
+    pidKp = kp; pidKi = ki; pidKd = kd;
+    document.getElementById('kpSlider').value = kp;
+    document.getElementById('kiSlider').value = ki;
+    document.getElementById('kdSlider').value = kd;
+    document.getElementById('kpVal').textContent = kp;
+    document.getElementById('kiVal').textContent = ki;
+    document.getElementById('kdVal').textContent = kd;
+
+    // Reset PID state for fair comparison
+    pidIntegral = 0;
+    pidPrevError = 0;
+    pidDFiltered = 0;
+
+    // Highlight active preset
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active-preset'));
+    event.target.classList.add('active-preset');
+}
+
+function resetSimulation() {
+    theta = 0;
+    omega = 0;
+    simTime = 0;
+    currentVoltage = 0;
+    pidIntegral = 0;
+    pidPrevError = 0;
+    pidDFiltered = 0;
+    pidPTerm = 0;
+    pidITerm = 0;
+    pidDTerm = 0;
+    graphData.time.length = 0;
+    graphData.angle.length = 0;
+    graphData.target.length = 0;
+    graphData.error.length = 0;
+    graphData.voltage.length = 0;
+    graphData.pTerm.length = 0;
+    graphData.iTerm.length = 0;
+    graphData.dTerm.length = 0;
+    stopTrajectory();
+}
+
+function togglePause() {
+    paused = !paused;
+    const btn = document.getElementById('pauseBtn');
+    btn.textContent = paused ? '재생' : '일시정지';
+    btn.classList.toggle('playing', !paused);
+}
+
+function toggleParams() {
+    const toggle = document.getElementById('paramsToggle');
+    const content = document.getElementById('paramsContent');
+    toggle.classList.toggle('open');
+    content.classList.toggle('show');
+}
+
+// ========== Trajectory Generator ==========
+let trajActive = false;
+let trajStartTime = 0;
+let trajStartAngle = 0;  // rad
+let trajEndAngle = 0;    // rad
+let trajMaxVel = 0;      // rad/s
+let trajAccelTime = 0;   // s
+let trajDecelTime = 0;   // s
+let trajCruiseTime = 0;  // s
+let trajTotalTime = 0;   // s
+let trajDirection = 1;   // +1 or -1
+
+function computeTrajectoryProfile(startDeg, endDeg, maxVelDeg, accelT, decelT) {
+    const distance = Math.abs(endDeg - startDeg); // degrees
+    const dir = endDeg >= startDeg ? 1 : -1;
+    const maxVel = maxVelDeg; // deg/s
+
+    // Distance covered during accel and decel
+    const dAccel = 0.5 * maxVel * accelT;
+    const dDecel = 0.5 * maxVel * decelT;
+    const dAccelDecel = dAccel + dDecel;
+
+    let cruiseTime, totalTime, actualMaxVel;
+
+    if (dAccelDecel <= distance) {
+        // Normal trapezoidal profile — cruise phase exists
+        cruiseTime = (distance - dAccelDecel) / maxVel;
+        totalTime = accelT + cruiseTime + decelT;
+        actualMaxVel = maxVel;
+    } else {
+        // Triangular profile — not enough distance for full speed
+        // Scale down: v_peak such that 0.5*v_peak*accelT + 0.5*v_peak*decelT = distance
+        // v_peak = 2*distance / (accelT + decelT)
+        actualMaxVel = 2 * distance / (accelT + decelT);
+        cruiseTime = 0;
+        totalTime = accelT + decelT;
+    }
+
+    return { dir, actualMaxVel, accelT, decelT, cruiseTime, totalTime, startDeg, distance };
+}
+
+function getTrajPosition(profile, t) {
+    const { dir, actualMaxVel, accelT, decelT, cruiseTime, totalTime, startDeg } = profile;
+    if (t <= 0) return startDeg;
+    if (t >= totalTime) return startDeg + dir * profile.distance;
+
+    let pos;
+    if (t <= accelT) {
+        // Acceleration phase
+        const v = (actualMaxVel / accelT) * t;
+        pos = 0.5 * (actualMaxVel / accelT) * t * t;
+    } else if (t <= accelT + cruiseTime) {
+        // Cruise phase
+        const tCruise = t - accelT;
+        pos = 0.5 * actualMaxVel * accelT + actualMaxVel * tCruise;
+    } else {
+        // Deceleration phase
+        const tDecel = t - accelT - cruiseTime;
+        const vStart = actualMaxVel;
+        const a = actualMaxVel / decelT;
+        pos = 0.5 * actualMaxVel * accelT
+            + actualMaxVel * cruiseTime
+            + vStart * tDecel - 0.5 * a * tDecel * tDecel;
+    }
+    return startDeg + dir * pos;
+}
+
+function getTrajPhase(profile, t) {
+    if (t <= 0) return '대기';
+    if (t >= profile.totalTime) return '완료';
+    if (t <= profile.accelT) return '가속';
+    if (t <= profile.accelT + profile.cruiseTime) return '정속';
+    return '감속';
+}
+
+let trajProfile = null;
+
+function openTrajectoryWindow() {
+    const overlay = document.getElementById('trajOverlay');
+    overlay.classList.add('show');
+    // Set start angle to current angle
+    document.getElementById('trajStartAngle').value = Math.round(theta * 180 / Math.PI);
+    updateTrajPreview();
+
+    // Listen for input changes
+    ['trajStartAngle','trajEndAngle','trajMaxVel','trajAccelTime','trajDecelTime'].forEach(id => {
+        document.getElementById(id).oninput = updateTrajPreview;
+    });
+}
+
+function closeTrajectoryWindow() {
+    document.getElementById('trajOverlay').classList.remove('show');
+}
+
+function updateTrajPreview() {
+    const startDeg = parseFloat(document.getElementById('trajStartAngle').value) || 0;
+    const endDeg = parseFloat(document.getElementById('trajEndAngle').value) || 0;
+    const maxVel = parseFloat(document.getElementById('trajMaxVel').value) || 90;
+    const accelT = parseFloat(document.getElementById('trajAccelTime').value) || 0.5;
+    const decelT = parseFloat(document.getElementById('trajDecelTime').value) || 0.5;
+
+    const profile = computeTrajectoryProfile(startDeg, endDeg, maxVel, accelT, decelT);
+
+    // Update labels
+    document.getElementById('trajLabelAccel').textContent = '가속 ' + accelT.toFixed(1) + 's';
+    document.getElementById('trajLabelCruise').textContent = '정속 ' + profile.cruiseTime.toFixed(1) + 's';
+    document.getElementById('trajLabelDecel').textContent = '감속 ' + decelT.toFixed(1) + 's';
+    document.getElementById('trajLabelTotal').textContent = '총 ' + profile.totalTime.toFixed(1) + 's';
+
+    // Draw preview
+    drawTrajPreview(profile);
+}
+
+function drawTrajPreview(profile) {
+    const canvas = document.getElementById('trajPreviewCanvas');
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(rect.width * dpr);
+    canvas.height = Math.floor(rect.height * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const w = rect.width, h = rect.height;
+    const pad = { left: 8, right: 8, top: 8, bottom: 8 };
+    const pw = w - pad.left - pad.right;
+    const ph = h - pad.top - pad.bottom;
+
+    ctx.clearRect(0, 0, w, h);
+
+    if (profile.totalTime <= 0 || profile.distance === 0) {
+        ctx.fillStyle = '#95a5a6';
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('이동 거리가 0입니다', w/2, h/2 + 4);
+        return;
+    }
+
+    const N = 200;
+    const dt = profile.totalTime / N;
+
+    // Compute velocity profile for display
+    const velPoints = [];
+    let maxV = 0;
+    for (let i = 0; i <= N; i++) {
+        const t = i * dt;
+        let v;
+        if (t <= profile.accelT) {
+            v = (profile.actualMaxVel / profile.accelT) * t;
+        } else if (t <= profile.accelT + profile.cruiseTime) {
+            v = profile.actualMaxVel;
+        } else {
+            const tD = t - profile.accelT - profile.cruiseTime;
+            v = profile.actualMaxVel - (profile.actualMaxVel / profile.decelT) * tD;
+        }
+        v = Math.max(0, v);
+        velPoints.push(v);
+        if (v > maxV) maxV = v;
+    }
+
+    // Also compute position profile
+    const posPoints = [];
+    for (let i = 0; i <= N; i++) {
+        const t = i * dt;
+        posPoints.push(getTrajPosition(profile, t));
+    }
+    const posMin = Math.min(profile.startDeg, profile.startDeg + profile.dir * profile.distance);
+    const posMax = Math.max(profile.startDeg, profile.startDeg + profile.dir * profile.distance);
+    const posRange = posMax - posMin || 1;
+
+    // Draw phase backgrounds
+    const accelEndX = pad.left + pw * (profile.accelT / profile.totalTime);
+    const cruiseEndX = pad.left + pw * ((profile.accelT + profile.cruiseTime) / profile.totalTime);
+
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillRect(pad.left, pad.top, accelEndX - pad.left, ph);
+    ctx.fillStyle = '#3498db';
+    ctx.fillRect(accelEndX, pad.top, cruiseEndX - accelEndX, ph);
+    ctx.fillStyle = '#f39c12';
+    ctx.fillRect(cruiseEndX, pad.top, pad.left + pw - cruiseEndX, ph);
+    ctx.globalAlpha = 1;
+
+    // Draw velocity curve (filled)
+    if (maxV > 0) {
+        ctx.beginPath();
+        ctx.moveTo(pad.left, pad.top + ph);
+        for (let i = 0; i <= N; i++) {
+            const x = pad.left + pw * (i / N);
+            const y = pad.top + ph - ph * (velPoints[i] / maxV) * 0.45;
+            ctx.lineTo(x, y);
+        }
+        ctx.lineTo(pad.left + pw, pad.top + ph);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(142,68,173,0.15)';
+        ctx.fill();
+
+        ctx.beginPath();
+        for (let i = 0; i <= N; i++) {
+            const x = pad.left + pw * (i / N);
+            const y = pad.top + ph - ph * (velPoints[i] / maxV) * 0.45;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = '#8e44ad';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+    // Draw position curve
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) {
+        const x = pad.left + pw * (i / N);
+        const y = pad.top + ph * 0.9 - ph * 0.85 * ((posPoints[i] - posMin) / posRange);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = '#3498db';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Legend
+    ctx.font = '10px sans-serif';
+    ctx.fillStyle = '#8e44ad';
+    ctx.fillRect(pad.left + 4, pad.top + 4, 10, 6);
+    ctx.fillStyle = '#555';
+    ctx.textAlign = 'left';
+    ctx.fillText('속도', pad.left + 18, pad.top + 10);
+    ctx.fillStyle = '#3498db';
+    ctx.fillRect(pad.left + 50, pad.top + 4, 10, 6);
+    ctx.fillStyle = '#555';
+    ctx.fillText('위치', pad.left + 64, pad.top + 10);
+}
+
+function applyTrajectory() {
+    const startDeg = parseFloat(document.getElementById('trajStartAngle').value) || 0;
+    const endDeg = parseFloat(document.getElementById('trajEndAngle').value) || 0;
+    const maxVelDeg = parseFloat(document.getElementById('trajMaxVel').value) || 90;
+    const accelT = parseFloat(document.getElementById('trajAccelTime').value) || 0.5;
+    const decelT = parseFloat(document.getElementById('trajDecelTime').value) || 0.5;
+
+    if (startDeg === endDeg) return;
+
+    trajProfile = computeTrajectoryProfile(startDeg, endDeg, maxVelDeg, accelT, decelT);
+    trajStartTime = simTime;
+    trajActive = true;
+
+    // Set current position to start angle and reset velocity
+    theta = startDeg * Math.PI / 180;
+    omega = 0;
+    pidIntegral = 0;
+    pidPrevError = 0;
+    pidDFiltered = 0;
+
+    // Set initial PID target
+    pidTarget = theta;
+    document.getElementById('targetSlider').value = startDeg;
+    document.getElementById('targetVal').textContent = startDeg + '°';
+
+    // Show status
+    document.getElementById('trajStatus').classList.add('show');
+    document.getElementById('btnTrajectory').classList.add('active');
+
+    closeTrajectoryWindow();
+    if (paused) togglePause(); // auto-resume
+}
+
+function stopTrajectory() {
+    trajActive = false;
+    trajProfile = null;
+    document.getElementById('trajStatus').classList.remove('show');
+    document.getElementById('btnTrajectory').classList.remove('active');
+}
+
+function updateTrajectory() {
+    if (!trajActive || !trajProfile) return;
+
+    const elapsed = simTime - trajStartTime;
+    const posDeg = getTrajPosition(trajProfile, elapsed);
+    const phase = getTrajPhase(trajProfile, elapsed);
+    const progress = Math.min(elapsed / trajProfile.totalTime, 1);
+
+    // Update PID target
+    pidTarget = posDeg * Math.PI / 180;
+
+    // Update target slider display
+    document.getElementById('targetSlider').value = Math.round(posDeg);
+    document.getElementById('targetVal').textContent = Math.round(posDeg) + '°';
+
+    // Update status display
+    document.getElementById('trajPhaseLabel').textContent = phase;
+    document.getElementById('trajTimeInfo').textContent =
+        elapsed.toFixed(1) + 's / ' + trajProfile.totalTime.toFixed(1) + 's';
+    document.getElementById('trajProgressFill').style.width = (progress * 100) + '%';
+
+    if (elapsed >= trajProfile.totalTime) {
+        // Keep final target, stop trajectory
+        pidTarget = (trajProfile.startDeg + trajProfile.dir * trajProfile.distance) * Math.PI / 180;
+        document.getElementById('trajPhaseLabel').textContent = '완료';
+        // Auto-stop after settling (2 seconds after completion)
+        if (elapsed >= trajProfile.totalTime + 2) {
+            stopTrajectory();
+        }
+    }
+}
+
+// ========== Main Loop ==========
+let lastFrameTime = 0;
+
+function mainLoop(timestamp) {
+    if (!lastFrameTime) lastFrameTime = timestamp;
+    lastFrameTime = timestamp;
+
+    simulationStep();
+    drawSimulation();
+    drawAllGraphs();
+
+    requestAnimationFrame(mainLoop);
+}
+
+requestAnimationFrame(mainLoop);
+</script>
+</body>
+</html>
